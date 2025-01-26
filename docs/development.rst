@@ -398,7 +398,130 @@ Common resources that a test might need,
 like e.g. a running MSColab server or a QApplication instance for GUI tests,
 are collected in :mod:`tests.fixtures` in the form of pytest fixtures that can be requested as needed in tests.
 
+Testing Keyring Features
+========================
 
+This document provides step-by-step instructions for testing keyring features using both the command line and Python scripts.
+
+Prerequisites
+-------------
+
+1. **Confirm the Default Keyring Backend**
+
+   Use the following command to list available keyring backends and check which one is currently in use:
+   ::
+
+       keyring --list-backends
+
+Command-Line Commands for Keyring
+---------------------------------
+
+1. **Set a Password**
+
+   Store a password for a specific service and user:
+   ::
+
+       keyring set SERVICE_NAME USERNAME
+
+   **Example:**
+   ::
+
+       keyring set msui user@example.com
+
+   - The command will securely prompt you to input a password (e.g., `example_password`).
+
+2. **Get a Password**
+
+   Retrieve the stored password for a service and user:
+   ::
+
+       keyring get SERVICE_NAME USERNAME
+
+   **Example:**
+   ::
+
+       keyring get msui user@example.com
+
+   **Output:**
+   ::
+
+       example_password
+
+3. **Delete a Password**
+
+   Remove the stored password for a service and user:
+   ::
+
+       keyring delete SERVICE_NAME USERNAME
+
+   **Example:**
+   ::
+
+       keyring delete msui user@example.com
+
+   To confirm the deletion, attempt to retrieve the password:
+   ::
+
+       keyring get msui user@example.com
+
+   If the password has been deleted, you’ll see an error message such as:
+   ::
+
+       No password found for 'msui' and 'user@example.com'.
+
+Python Script for Keyring Automation
+------------------------------------
+
+1. **Set a Password**
+
+   Store a password for a specific service and user:
+   ::
+
+       import keyring
+
+       keyring.set_password("msui", "user@example.com", "example_password")
+
+2. **Retrieve the Password**
+
+   Retrieve the stored password:
+   ::
+
+       import keyring
+
+       print(keyring.get_password("msui", "user@example.com"))  # Output: example_password
+
+3. **Delete a Password**
+
+   Delete the stored password:
+   ::
+
+       import keyring
+
+       keyring.delete_password("msui", "user@example.com")
+
+4. **Verify Deletion**
+
+   Attempt to retrieve the deleted password:
+   ::
+
+       import keyring
+
+       print(keyring.get_password("msui", "user@example.com"))  # Output: None or error
+
+Examples of Usage in Command Line
+---------------------------------
+
+::
+
+    # Set a password
+    keyring set my_service my_user
+
+    # Get the password
+    keyring get my_service my_user
+
+    # Delete the password
+    keyring delete my_service my_user
+    
 Changing the database model
 ---------------------------
 
