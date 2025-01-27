@@ -399,12 +399,12 @@ like e.g. a running MSColab server or a QApplication instance for GUI tests,
 are collected in :mod:`tests.fixtures` in the form of pytest fixtures that can be requested as needed in tests.
 
 Testing Keyring Features
-========================
+-------------------------
 
 This document provides step-by-step instructions for testing keyring features using both the command line and Python scripts.
 
 Prerequisites
--------------
+.............
 
 1. **Confirm the Default Keyring Backend**
 
@@ -414,7 +414,7 @@ Prerequisites
        keyring --list-backends
 
 Command-Line Commands for Keyring
----------------------------------
+.................................
 
 1. **Set a Password**
 
@@ -470,7 +470,7 @@ Command-Line Commands for Keyring
        No password found for 'msui' and 'user@example.com'.
 
 Python Script for Keyring Automation
-------------------------------------
+......................................
 
 1. **Set a Password**
 
@@ -509,7 +509,7 @@ Python Script for Keyring Automation
        print(keyring.get_password("msui", "user@example.com"))  # Output: None or error
 
 Examples of Usage in Command Line
----------------------------------
+......................................
 
 ::
 
