@@ -886,7 +886,7 @@ class MSUIMscolab(QtCore.QObject):
         self.fetch_profile_image()
 
     @verify_user_token
-    def upload_image(self):
+    def upload_image(self, _=None):
         file_name, _ = QFileDialog.getOpenFileName(self.prof_diag, "Open Image", "",
                                                    "Image (*.png *.gif *.jpg *.jpeg *.bpm)")
         if file_name:
