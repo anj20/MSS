@@ -1,8 +1,8 @@
-"""Fix wrong stored None strings
+"""to_version_11_0_0
 
-Revision ID: d6777bb31b64
+Revision ID: 6c44d67e505a
 Revises: 922e4d9c94e2
-Create Date: 2025-02-04 22:46:11.605418
+Create Date: 2025-02-05 00:44:29.932413
 
 """
 from alembic import op
@@ -11,10 +11,11 @@ import mslib.mscolab.custom_migration_types as cu
 
 
 # revision identifiers, used by Alembic.
-revision = 'd6777bb31b64'
+revision = '6c44d67e505a'
 down_revision = '922e4d9c94e2'
 branch_labels = None
 depends_on = None
+
 
 
 def upgrade():
