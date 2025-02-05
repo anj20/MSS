@@ -61,7 +61,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import QDialog, QFileDialog, QMessageBox
 from PyQt5.QtGui import QPixmap
 
-from mslib.utils.auth import get_password_from_keyring, save_password_to_keyring
+from mslib.utils.auth import get_password_from_keyring, save_password_to_keyring, del_password_from_keyring
 from mslib.utils.verify_user_token import verify_user_token as _verify_user_token
 from mslib.utils.verify_waypoint_data import verify_waypoint_data
 from mslib.utils.qt import get_open_filename, get_save_filename, dropEvent, dragEnterEvent, show_popup
@@ -73,7 +73,6 @@ from mslib.msui.qt5 import ui_mscolab_profile_dialog as ui_profile
 from mslib.msui.qt5 import ui_operation_archive as ui_opar
 from mslib.msui import constants
 from mslib.utils.config import config_loader, modify_config_file
-
 
 def verify_user_token(func):
     if not hasattr(verify_user_token, "depth"):
@@ -937,6 +936,7 @@ class MSUIMscolab(QtCore.QObject):
         if reply == QMessageBox.No:
             return
         try:
+            del_password_from_keyring(self.mscolab_server_url, config_loader(dataset="MSCOLAB_auth_user_name"))
             response = self.conn.request_post("delete_own_account")
         except requests.exceptions.RequestException as ex:
             raise MSColabConnectionError(f"Some error occurred ({ex})! Please reconnect.")
