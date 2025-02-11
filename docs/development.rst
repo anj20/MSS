@@ -490,6 +490,7 @@ Command-Line Commands for Keyring
    .. code-block:: bash
 
        keyring get MSCOLAB_AUTH_http://localhost:8083 mscolab
+       
 
 Changing the database model
 ---------------------------
