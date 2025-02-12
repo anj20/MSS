@@ -63,7 +63,7 @@ It is possible to list all versions of `mss` available on your platform with:
 For a simple test you can setup a demodata wms server and start a msolab server with default settings
 
 ```
-  (mssenv) $ mswms_demodata --seed
+  (mssenv) $ mswms --seed
   (mssenv) $ export PYTHONPATH=~/mss
   (mssenv) $ mswms &
   (mssenv) $ mscolab start &
