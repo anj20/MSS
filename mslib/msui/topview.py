@@ -32,7 +32,7 @@ import functools
 import logging
 
 from mslib.utils.config import config_loader
-from mslib.utils.coordinate import get_projection_params
+from mslib.utils.get_projection_params import get_projection_params
 from PyQt5 import QtGui, QtWidgets, QtCore
 from mslib.msui.qt5 import ui_topview_window as ui
 from mslib.msui.qt5 import ui_topview_mapappearance as ui_ma
@@ -44,8 +44,10 @@ from mslib.msui import kmloverlay_dockwidget as kml
 from mslib.msui import airdata_dockwidget as ad
 from mslib.msui import multiple_flightpath_dockwidget as mf
 from mslib.msui import flighttrack as ft
+from mslib.msui import autoplot_dockwidget as apd
 from mslib.msui.icons import icons
 from mslib.msui.flighttrack import Waypoint
+from mslib.utils.colordialog import CustomColorDialog
 
 # Dock window indices.
 WMS = 0
@@ -54,6 +56,7 @@ REMOTESENSING = 2
 KMLOVERLAY = 3
 AIRDATA = 4
 MULTIPLEFLIGHTPATH = 5
+AUTOPLOT = 6
 
 
 class MSUI_TV_MapAppearanceDialog(QtWidgets.QDialog, ui_ma.Ui_MapAppearanceDialog):
@@ -62,6 +65,9 @@ class MSUI_TV_MapAppearanceDialog(QtWidgets.QDialog, ui_ma.Ui_MapAppearanceDialo
     defined in "ui_topview_mapappearance.py".
     """
     signal_ft_vertices_color_change = QtCore.pyqtSignal(str, tuple)
+    signal_line_thickness_change = QtCore.pyqtSignal(float)
+    signal_line_style_change = QtCore.pyqtSignal(str)
+    signal_transparency_change = QtCore.pyqtSignal(float)
 
     def __init__(self, parent=None, settings=None, wms_connected=False):
         """
@@ -95,6 +101,11 @@ class MSUI_TV_MapAppearanceDialog(QtWidgets.QDialog, ui_ma.Ui_MapAppearanceDialo
         self.cbDrawMarker.setChecked(settings["draw_marker"])
         self.cbLabelFlightTrack.setChecked(settings["label_flighttrack"])
 
+        self.sbLineThickness.setValue(settings.get("line_thickness", 2))
+        self.cbLineStyle.addItems(["Solid", "Dashed", "Dotted", "Dash-dot"])  # Item added in the list
+        self.cbLineStyle.setCurrentText(settings.get("line_style", "Solid"))
+        self.hsTransparencyControl.setValue(int(settings.get("line_transparency", 1.0) * 100))
+
         for button, ids in [(self.btWaterColour, "colour_water"),
                             (self.btLandColour, "colour_land"),
                             (self.btWaypointsColour, "colour_ft_waypoints"),
@@ -111,6 +122,15 @@ class MSUI_TV_MapAppearanceDialog(QtWidgets.QDialog, ui_ma.Ui_MapAppearanceDialo
         self.btWaypointsColour.clicked.connect(functools.partial(self.setColour, "ft_waypoints"))
         self.btVerticesColour.clicked.connect(functools.partial(self.setColour, "ft_vertices"))
 
+        # Store values instead of emitting signals immediately
+        self.line_thickness = settings.get("line_thickness", 2)
+        self.line_style = settings.get("line_style", "Solid")
+        self.line_transparency = settings.get("line_transparency", 1.0)
+
+        self.sbLineThickness.valueChanged.connect(self.onLineThicknessChanged)
+        self.cbLineStyle.currentTextChanged.connect(self.onLineStyleChanged)
+        self.hsTransparencyControl.valueChanged.connect(self.onTransparencyChanged)
+
         # Shows previously selected element in the fontsize comboboxes as the current index.
         for i in range(self.tov_cbtitlesize.count()):
             if self.tov_cbtitlesize.itemText(i) == settings["tov_plot_title_size"]:
@@ -119,6 +139,15 @@ class MSUI_TV_MapAppearanceDialog(QtWidgets.QDialog, ui_ma.Ui_MapAppearanceDialo
         for i in range(self.tov_cbaxessize.count()):
             if self.tov_cbaxessize.itemText(i) == settings["tov_axes_label_size"]:
                 self.tov_cbaxessize.setCurrentIndex(i)
+
+    def onLineThicknessChanged(self, value):
+        self.line_thickness = value
+
+    def onLineStyleChanged(self, value):
+        self.line_style = value
+
+    def onTransparencyChanged(self, value):
+        self.line_transparency = value / 100.0
 
     def get_settings(self):
         """
@@ -133,7 +162,9 @@ class MSUI_TV_MapAppearanceDialog(QtWidgets.QDialog, ui_ma.Ui_MapAppearanceDialo
             "label_flighttrack": self.cbLabelFlightTrack.isChecked(),
             "tov_plot_title_size": self.tov_cbtitlesize.currentText(),
             "tov_axes_label_size": self.tov_cbaxessize.currentText(),
-
+            "line_thickness": self.line_thickness,
+            "line_style": self.line_style,
+            "line_transparency": self.line_transparency,
             "colour_water":
                 QtGui.QPalette(self.btWaterColour.palette()).color(QtGui.QPalette.Button).getRgbF(),
             "colour_land":
@@ -159,12 +190,15 @@ class MSUI_TV_MapAppearanceDialog(QtWidgets.QDialog, ui_ma.Ui_MapAppearanceDialo
         elif which == "ft_waypoints":
             button = self.btWaypointsColour
 
-        palette = QtGui.QPalette(button.palette())
-        colour = palette.color(QtGui.QPalette.Button)
-        colour = QtWidgets.QColorDialog.getColor(colour)
-        if colour.isValid():
-            self.signal_ft_vertices_color_change.emit(which, colour.getRgbF())
-            palette.setColor(QtGui.QPalette.Button, colour)
+        dialog = CustomColorDialog(self)
+        dialog.color_selected.connect(lambda color: self.on_color_selected(which, color, button))
+        dialog.show()
+
+    def on_color_selected(self, which, color, button):
+        if color.isValid():
+            self.signal_ft_vertices_color_change.emit(which, color.getRgbF())
+            palette = QtGui.QPalette(button.palette())
+            palette.setColor(QtGui.QPalette.Button, color)
             button.setPalette(palette)
 
 
@@ -185,15 +219,24 @@ class MSUITopViewWindow(MSUIMplViewWindow, ui.Ui_TopViewWindow):
     signal_listFlighttrack_doubleClicked = QtCore.pyqtSignal()
     signal_permission_revoked = QtCore.pyqtSignal(int)
     signal_render_new_permission = QtCore.pyqtSignal(int, str)
+    sections_changed = QtCore.pyqtSignal(str)
+    refresh_signal_emit = QtCore.pyqtSignal()
+    refresh_signal_send = QtCore.pyqtSignal()
+    item_selected = QtCore.pyqtSignal(str, str, str, str)
+    itemSecs_selected = QtCore.pyqtSignal(str)
+    vtime_vals = QtCore.pyqtSignal([list])
 
     def __init__(self, parent=None, mainwindow=None, model=None, _id=None,
-                 active_flighttrack=None, mscolab_server_url=None, token=None):
+                 active_flighttrack=None, mscolab_server_url=None, token=None, config_settings=None,
+                 tutorial_mode=False):
         """
         Set up user interface, connect signal/slots.
         """
         super().__init__(parent, model, _id)
         logging.debug(_id)
         self.settings_tag = "topview"
+        self.tutorial_mode = tutorial_mode
+        # ToDo review 2026 after EOL of Win 10 if we can use parent again
         self.mainwindow_signal_login_mscolab = mainwindow.signal_login_mscolab
         self.mainwindow_signal_logout_mscolab = mainwindow.signal_logout_mscolab
         self.mainwindow_signal_listFlighttrack_doubleClicked = mainwindow.signal_listFlighttrack_doubleClicked
@@ -209,7 +252,7 @@ class MSUITopViewWindow(MSUIMplViewWindow, ui.Ui_TopViewWindow):
         self.setWindowIcon(QtGui.QIcon(icons('64x64')))
 
         # Dock windows [WMS, Satellite, Trajectories, Remote Sensing, KML Overlay, Multiple Flightpath]:
-        self.docks = [None, None, None, None, None, None]
+        self.docks = [None, None, None, None, None, None, None]
 
         # Initialise the GUI elements (map view, items of combo boxes etc.).
         self.setup_top_view()
@@ -227,8 +270,21 @@ class MSUITopViewWindow(MSUIMplViewWindow, ui.Ui_TopViewWindow):
         self.mscolab_server_url = mscolab_server_url
         self.token = token
 
+        self.currurl = ""
+        self.currlayer = ""
+        self.currlevel = ""
+        self.currstyles = ""
+        self.currsections = ""
+        self.currflights = ""
+        self.curritime = ""
+        self.currvtime = ""
+        self.currlayerobj = None
+
         # Connect slots and signals.
         # ==========================
+        # ToDo review 2026 after EOL of Win 10 if we can use parent again
+        if mainwindow is not None:
+            mainwindow.refresh_signal_connect.connect(self.refresh_signal_send.emit)
 
         # Map controls.
         self.btMapRedraw.clicked.connect(self.mpl.canvas.redraw_map)
@@ -241,7 +297,8 @@ class MSUITopViewWindow(MSUIMplViewWindow, ui.Ui_TopViewWindow):
         self.btRoundtrip.clicked.connect(self.make_roundtrip)
 
         # Tool opener.
-        self.cbTools.currentIndexChanged.connect(self.openTool)
+        self.cbTools.currentIndexChanged.connect(lambda ind: self.openTool(
+            index=ind, parent=mainwindow, config_settings=config_settings))
 
         if mainwindow is not None:
             # Update flighttrack
@@ -288,8 +345,8 @@ class MSUITopViewWindow(MSUIMplViewWindow, ui.Ui_TopViewWindow):
         Initialise GUI elements. (This method is called before signals/slots
         are connected).
         """
-        toolitems = ["(select to open control)", "Web Map Service", "Satellite Tracks", "Remote Sensing", "KML Overlay",
-                     "Airports/Airspaces", "Multiple Flightpath"]
+        toolitems = ["(select to open control)", "Web Map Service", "Satellite Tracks", "Remote Sensing",
+                     "KML Overlay", "Airports/Airspaces", "Multiple Flightpath", "Autoplot"]
         self.cbTools.clear()
         self.cbTools.addItems(toolitems)
 
@@ -322,7 +379,7 @@ class MSUITopViewWindow(MSUIMplViewWindow, ui.Ui_TopViewWindow):
         if current_map_key in predefined_map_sections.keys():
             self.cbChangeMapSection.setCurrentText(current_map_key)
 
-    def openTool(self, index):
+    def openTool(self, index, parent=None, config_settings=None):
         """
         Slot that handles requests to open control windows.
         """
@@ -335,6 +392,16 @@ class MSUITopViewWindow(MSUIMplViewWindow, ui.Ui_TopViewWindow):
                     default_WMS=config_loader(dataset="default_WMS"),
                     view=self.mpl.canvas,
                     wms_cache=config_loader(dataset="wms_cache"))
+                widget.vtime_data.connect(lambda vtime: self.valid_time_vals(vtime))
+                widget.base_url_changed.connect(lambda url: self.url_val_changed(url))
+                widget.layer_changed.connect(lambda layer: self.layer_val_changed(layer))
+                widget.on_level_changed.connect(lambda level: self.level_val_changed(level))
+                widget.styles_changed.connect(lambda styles: self.styles_val_changed(styles))
+                widget.itime_changed.connect(lambda styles: self.itime_val_changed(styles))
+                widget.vtime_changed.connect(lambda styles: self.vtime_val_changed(styles))
+                self.item_selected.connect(lambda url, layer, style,
+                                           level: widget.row_is_selected(url, layer, style, level, "top"))
+                self.itemSecs_selected.connect(lambda vtime: widget.leftrow_is_selected(vtime))
                 widget.signal_disable_cbs.connect(self.disable_cbs)
                 widget.signal_enable_cbs.connect(self.enable_cbs)
             elif index == SATELLITE:
@@ -369,6 +436,16 @@ class MSUITopViewWindow(MSUIMplViewWindow, ui.Ui_TopViewWindow):
                     lambda op_id, path: self.signal_render_new_permission.emit(op_id, path))
                 if self.active_op_id is not None:
                     self.signal_activate_operation.emit(self.active_op_id)
+            elif index == AUTOPLOT:
+                title = "Autoplot (Top View)"
+                widget = apd.AutoplotDockWidget(parent=self, parent2=parent,
+                                                view="Top View", config_settings=config_settings)
+                widget.treewidget_item_selected.connect(
+                    lambda url, layer, style, level: self.tree_item_select(url, layer, style, level))
+                widget.autoplot_treewidget_item_selected.connect(
+                    lambda section, vtime: self.treePlot_item_select(section, vtime))
+                widget.update_op_flight_treewidget.connect(
+                    lambda opfl, flight: parent.update_treewidget_op_fl(opfl, flight))
             else:
                 raise IndexError("invalid control index")
 
@@ -383,6 +460,52 @@ class MSUITopViewWindow(MSUIMplViewWindow, ui.Ui_TopViewWindow):
     def enable_cbs(self):
         self.wms_connected = False
 
+    @QtCore.pyqtSlot()
+    def tree_item_select(self, url, layer, style, level):
+        self.item_selected.emit(url, layer, style, level)
+
+    @QtCore.pyqtSlot()
+    def treePlot_item_select(self, section, vtime):
+        self.cbChangeMapSection.setCurrentText(section)
+        self.changeMapSection()
+        self.itemSecs_selected.emit(vtime)
+
+    @QtCore.pyqtSlot()
+    def url_val_changed(self, strr):
+        self.currurl = strr
+
+    @QtCore.pyqtSlot()
+    def valid_time_vals(self, vtimes_list):
+        self.vtime_vals.emit(vtimes_list)
+
+    @QtCore.pyqtSlot()
+    def layer_val_changed(self, strr):
+        self.currlayerobj = strr
+        layerstring = str(strr)
+        second_colon_index = layerstring.find(':', layerstring.find(':') + 1)
+        self.currurl = layerstring[:second_colon_index].strip() if second_colon_index != -1 else layerstring.strip()
+        self.currlayer = layerstring.split('|')[1].strip() if '|' in layerstring else None
+
+    @QtCore.pyqtSlot()
+    def level_val_changed(self, strr):
+        self.currlevel = strr.split(' ')[0]
+
+    @QtCore.pyqtSlot()
+    def styles_val_changed(self, strr):
+        if strr is None or not str(strr).strip():
+            self.currstyles = ""
+        else:
+            split_strr = str(strr).strip().split()
+            self.currstyles = split_strr[0].strip() if split_strr else ""
+
+    @QtCore.pyqtSlot()
+    def itime_val_changed(self, strr):
+        self.curritime = strr
+
+    @QtCore.pyqtSlot()
+    def vtime_val_changed(self, strr):
+        self.currvtime = strr
+
     def changeMapSection(self, index=0, only_kwargs=False):
         """
         Change the current map section to one of the predefined regions.
@@ -393,22 +516,23 @@ class MSUITopViewWindow(MSUIMplViewWindow, ui.Ui_TopViewWindow):
             dataset="predefined_map_sections")
         current_map = predefined_map_sections.get(
             current_map_key, {"CRS": current_map_key, "map": {}})
-        proj_params = get_projection_params(current_map["CRS"])
 
-        # Create a keyword arguments dictionary for basemap that contains
-        # the projection parameters.
-        kwargs = dict(current_map["map"])
-        kwargs.update({"CRS": current_map["CRS"], "BBOX_UNITS": proj_params["bbox"],
-                       "OPERATION_NAME": self.waypoints_model.name})
-        kwargs.update(proj_params["basemap"])
+        if current_map["CRS"] != "":
+            proj_params = get_projection_params(current_map["CRS"])
+            # Create a keyword arguments dictionary for basemap that contains
+            # the projection parameters.
+            kwargs = dict(current_map["map"])
+            kwargs.update({"CRS": current_map["CRS"], "BBOX_UNITS": proj_params["bbox"],
+                           "OPERATION_NAME": self.waypoints_model.name})
+            kwargs.update(proj_params["basemap"])
 
-        if only_kwargs:
-            # Return kwargs dictionary and do NOT redraw the map.
-            return kwargs
+            if only_kwargs:
+                # Return kwargs dictionary and do NOT redraw the map.
+                return kwargs
 
-        logging.debug("switching to map section '%s' - '%s'", current_map_key, kwargs)
-        self.mpl.canvas.redraw_map(kwargs)
-        self.mpl.navbar.clear_history()
+            logging.debug("switching to map section '%s' - '%s'", current_map_key, kwargs)
+            self.mpl.canvas.redraw_map(kwargs)
+            self.mpl.navbar.clear_history()
 
     def setIdentifier(self, identifier):
         super().setIdentifier(identifier)
@@ -416,16 +540,35 @@ class MSUITopViewWindow(MSUIMplViewWindow, ui.Ui_TopViewWindow):
 
     def open_settings_dialog(self):
         """
+        Open the map appearance settings dialog.
         """
         settings = self.getView().get_settings()
         dlg = MSUI_TV_MapAppearanceDialog(parent=self, settings=settings, wms_connected=self.wms_connected)
         dlg.setModal(False)
         dlg.signal_ft_vertices_color_change.connect(self.set_ft_vertices_color)
+        dlg.signal_line_thickness_change.connect(self.set_line_thickness)  # Connect to signal
+        dlg.signal_line_style_change.connect(self.set_line_style)
+        dlg.signal_transparency_change.connect(self.set_line_transparency)
         if dlg.exec_() == QtWidgets.QDialog.Accepted:
             settings = dlg.get_settings()
+            self.set_line_thickness(settings["line_thickness"])
+            self.set_line_style(settings["line_style"])
+            self.set_line_transparency(settings["line_transparency"])
             self.getView().set_settings(settings, save=True)
             self.mpl.canvas.waypoints_interactor.redraw_path()
         dlg.destroy()
+
+    def set_line_thickness(self, thickness):
+        """Set the line thickness of the flight track."""
+        self.mpl.canvas.waypoints_interactor.set_line_thickness(thickness)
+
+    def set_line_style(self, style):
+        """Set the line style of the flight track"""
+        self.mpl.canvas.waypoints_interactor.set_line_style(style)
+
+    def set_line_transparency(self, transparency):
+        """Set the line transparency of the flight track"""
+        self.mpl.canvas.waypoints_interactor.set_line_transparency(transparency)
 
     @QtCore.pyqtSlot(str, tuple)
     def set_ft_vertices_color(self, which, color):

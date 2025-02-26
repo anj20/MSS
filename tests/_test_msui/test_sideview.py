@@ -31,9 +31,10 @@ import os
 import pytest
 import shutil
 import tempfile
-from PyQt5 import QtTest, QtCore, QtGui
+from PyQt5 import QtTest, QtCore, QtGui, QtWidgets
 from mslib.msui import flighttrack as ft
 import mslib.msui.sideview as tv
+from mslib.msui.msui import MSUIMainWindow
 from mslib.msui.mpl_qtwidget import _DEFAULT_SETTINGS_SIDEVIEW
 
 
@@ -65,22 +66,84 @@ class Test_MSS_SV_OptionsDialog:
         levels = self.window.get_flight_levels()
         assert all(x == y for x, y in zip(levels, [0, 300, 320, 340]))
 
-    @mock.patch("PyQt5.QtWidgets.QColorDialog.getColor", return_value=QtGui.QColor())
-    def test_setColour(self, mockdlg):
-        QtTest.QTest.mouseClick(self.window.btFillColour, QtCore.Qt.LeftButton)
-        assert mockdlg.call_count == 1
+    def test_setColour(self):
+        """
+        Test the setColour function to ensure the color dialog opens and the correct color is set.
+        """
+        # Simulate clicking the "Water" color button to open the color dialog
+        self.window.setColour("ft_vertices")
+
+        # Get a reference to the custom color dialog
+        color_dialog = self.window.findChild(QtWidgets.QDialog)
+        assert color_dialog is not None
+
+        # Select the first color in the color dialog (assuming color_buttons is a list of buttons)
+        color_dialog.color_buttons[0].click()
+
+        # Get the selected color
+        selected_color = QtGui.QColor(color_dialog.colors[0])
+
+        # Verify that the button's color has been set correctly
+        button_palette = self.window.btVerticesColour.palette()
+        button_color = button_palette.button().color()
+        assert button_color.getRgbF() == selected_color.getRgbF()
+
+        # Verify that the correct color was set in the settings
+        settings = self.window.get_settings()
+        assert settings['colour_ft_vertices'] == selected_color.getRgbF()
+
+    def test_line_thickness_change(self):
+        """
+        Test the thickness of the flighttrack
+        """
+        # Verify initial value
+        assert self.window.line_thickness == _DEFAULT_SETTINGS_SIDEVIEW.get("line_thickness", 2)
+
+        # Simulate changing line thickness
+        new_thickness = 5.00
+        self.window.sbLineThickness.setValue(new_thickness)
+
+        settings = self.window.get_settings()
+        assert settings['line_thickness'] == new_thickness
+
+    def test_line_style_change(self):
+        """
+        Test the style of the flighttrack
+        """
+        assert self.window.line_style == _DEFAULT_SETTINGS_SIDEVIEW.get("line_style", "Solid")
+
+        # Simulate changing line style
+        new_style = "Dashed"
+        self.window.cbLineStyle.setCurrentText(new_style)
+
+        settings = self.window.get_settings()
+        assert settings['line_style'] == new_style
+
+    def test_line_transparency_change(self):
+        """
+        Test the transparency of the flighttrack
+        """
+        assert self.window.line_transparency == _DEFAULT_SETTINGS_SIDEVIEW.get("line_transparency", 1.0)
+
+        # Simulate changing transparency
+        new_transparency = 50  # == 0.5
+        self.window.hsTransparencyControl.setValue(new_transparency)
+
+        settings = self.window.get_settings()
+        assert settings['line_transparency'] == new_transparency / 100
 
 
 class Test_MSSSideViewWindow:
     @pytest.fixture(autouse=True)
     def setup(self, qtbot):
+        mainwindow = MSUIMainWindow()
         initial_waypoints = [ft.Waypoint(40., 25., 300), ft.Waypoint(60., -10., 400), ft.Waypoint(40., 10, 300)]
 
         waypoints_model = ft.WaypointsTableModel("")
         waypoints_model.insertRows(
             0, rows=len(initial_waypoints), waypoints=initial_waypoints)
 
-        self.window = tv.MSUISideViewWindow(model=waypoints_model)
+        self.window = tv.MSUISideViewWindow(model=waypoints_model, parent=mainwindow)
         self.window.show()
         QtTest.QTest.qWaitForWindowExposed(self.window)
         yield
@@ -127,6 +190,7 @@ class Test_MSSSideViewWindow:
 class Test_SideViewWMS:
     @pytest.fixture(autouse=True)
     def setup(self, qtbot, mswms_server):
+        mainwindow = MSUIMainWindow()
         self.url = mswms_server
         self.tempdir = tempfile.mkdtemp()
         if not os.path.exists(self.tempdir):
@@ -136,7 +200,7 @@ class Test_SideViewWMS:
         waypoints_model = ft.WaypointsTableModel("")
         waypoints_model.insertRows(
             0, rows=len(initial_waypoints), waypoints=initial_waypoints)
-        self.window = tv.MSUISideViewWindow(model=waypoints_model)
+        self.window = tv.MSUISideViewWindow(model=waypoints_model, parent=mainwindow)
         self.window.show()
         QtTest.QTest.qWaitForWindowExposed(self.window)
         self.window.cbTools.currentIndexChanged.emit(1)

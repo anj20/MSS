@@ -51,7 +51,8 @@ import matplotlib.path as mpath
 import matplotlib.patches as mpatches
 from PyQt5 import QtCore, QtWidgets
 
-from mslib.utils.coordinate import get_distance, find_location, latlon_points, path_points
+from mslib.utils.coordinate import get_distance, latlon_points, path_points
+from mslib.utils.find_location import find_location
 from mslib.utils.units import units
 from mslib.utils.thermolib import pressure2flightlevel
 from mslib.msui import flighttrack as ft
@@ -110,7 +111,7 @@ class WaypointsPath(mpath.Path):
            matplotlib.Path) at the given index.
         """
         self.vertices = np.insert(self.vertices, index,
-                                  np.asarray(vertex, np.float_), axis=0)
+                                  np.asarray(vertex, np.float64), axis=0)
         self.codes = np.insert(self.codes, index, code, axis=0)
 
     def index_of_closest_segment(self, x, y, eps=5):
@@ -336,7 +337,7 @@ class PathPlotter:
     def __init__(self, ax, mplpath=None,
                  facecolor='blue', edgecolor='yellow',
                  linecolor='blue', markerfacecolor='red',
-                 marker='o', label_waypoints=True):
+                 marker='o', label_waypoints=True, line_thickness=2, line_style="Solid", line_transparency=1.0):
         """The constructor initializes the path patches, overlying line
            plot and connects matplotlib signals.
 
@@ -367,11 +368,20 @@ class PathPlotter:
         self.pathpatch = pathpatch
         self.pathpatch.set_animated(True)  # ensure correct redrawing
 
+        # Initialize line style options
+        self.line_style_dict = {
+            "Solid": '-',
+            "Dashed": '--',
+            "Dotted": ':',
+            "Dash-dot": '-.'
+        }
+
         # Draw the line representing flight track or profile (correct
         # vertices handling for the line needs to be ensured in subclasses).
         x, y = list(zip(*self.pathpatch.get_path().vertices))
         self.line, = self.ax.plot(x, y, color=linecolor,
-                                  marker=marker, linewidth=2,
+                                  marker=marker, linewidth=line_thickness, linestyle=self.line_style_dict[line_style],
+                                  alpha=line_transparency,
                                   markerfacecolor=markerfacecolor,
                                   animated=True)
 
@@ -383,6 +393,26 @@ class PathPlotter:
         canvas = self.ax.figure.canvas
         canvas.mpl_connect('draw_event', self.draw_callback)
         self.canvas = canvas
+
+    def get_line_style_dict(self):
+        """return the line style dict so other class can access it"""
+        return self.line_style_dict
+
+    def set_line_thickness(self, thickness):
+        """Set the line thickness of the flight track."""
+        self.line.set_linewidth(thickness)
+        self.canvas.draw()
+
+    def set_line_style(self, style):
+        """Set the line style of the flight track."""
+        if style in self.line_style_dict:
+            self.line.set_linestyle(self.line_style_dict[style])
+            self.canvas.draw()
+
+    def set_line_transparency(self, transparency):
+        """Set the line transparency of the flight track."""
+        self.line.set_alpha(transparency)
+        self.canvas.draw()
 
     def draw_callback(self, event):
         """Called when the figure is redrawn. Stores background data (for later
@@ -932,6 +962,23 @@ class VPathInteractor(PathInteractor):
         self.clear_figure = clear_figure
         super().__init__(plotter=plotter, waypoints=waypoints)
 
+    def set_line_thickness(self, thickness):
+        """Set the thickness of the line representing the flight track."""
+        self.plotter.line.set_linewidth(thickness)
+        self.redraw_figure()
+
+    def set_line_style(self, style):
+        """Set the style of the line representing the flight track."""
+        line_style_dict = self.plotter.get_line_style_dict()
+        if style in line_style_dict:
+            self.plotter.set_line_style(style)
+            self.redraw_figure()
+
+    def set_line_transparency(self, transparency):
+        """Set the transparency of the line representing the flight track."""
+        self.plotter.line.set_alpha(transparency)
+        self.redraw_figure()
+
     def redraw_figure(self):
         """For the side view, changes in the horizontal position of a waypoint
            (including moved waypoints, new or deleted waypoints) make a complete
@@ -1127,6 +1174,23 @@ class HPathInteractor(PathInteractor):
             linecolor=linecolor, markerfacecolor=markerfacecolor,
             label_waypoints=label_waypoints)
         super().__init__(plotter=plotter, waypoints=waypoints)
+        self.redraw_path()
+
+    def set_line_thickness(self, thickness):
+        """Set the thickness of the line representing the flight track."""
+        self.plotter.line.set_linewidth(thickness)
+        self.redraw_path()
+
+    def set_line_style(self, style):
+        """Set the style of the line representing the flight track."""
+        line_style_dict = self.plotter.get_line_style_dict()
+        if style in line_style_dict:
+            self.plotter.set_line_style(style)
+            self.redraw_path()
+
+    def set_line_transparency(self, transparency):
+        """Set the transparency of the line representing the flight track."""
+        self.plotter.line.set_alpha(transparency)
         self.redraw_path()
 
     def appropriate_epsilon(self, px=5):

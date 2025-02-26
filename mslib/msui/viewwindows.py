@@ -215,22 +215,42 @@ class MSUIViewWindow(QtWidgets.QMainWindow):
             self.tableWayPoints.setEnabled(False)
 
     def changeEvent(self, event):
-        top_left = self.mapToGlobal(QtCore.QPoint(0, 0))
-        if top_left.x() != 0:
-            os_screen_region = (top_left.x(), top_left.y(), self.width(), self.height())
-            settings = {'os_screen_region': os_screen_region}
-            # we have to save this to reuse it by the tutorials
-            save_settings_qsettings(self.settings_tag, settings)
-        QtWidgets.QWidget.changeEvent(self, event)
+        """
+        Change event method
+
+        This method is called when a change event is triggered for the linearview, tableview, topview, sideview widget.
+        It is an overridden method of the QWidget class.
+
+        Parameters:
+        :event: The QEvent object representing the change event.
+        """
+        if self.tutorial_mode:
+            top_left = self.mapToGlobal(QtCore.QPoint(0, 0))
+            if top_left.x() != 0:
+                os_screen_region = (top_left.x(), top_left.y(), self.width(), self.height())
+                settings = {'os_screen_region': os_screen_region}
+                # we have to save this to reuse it by the tutorials
+                save_settings_qsettings(self.settings_tag, settings)
+            QtWidgets.QWidget.changeEvent(self, event)
 
     def moveEvent(self, event):
-        top_left = self.mapToGlobal(QtCore.QPoint(0, 0))
-        if top_left.x() != 0:
-            os_screen_region = (top_left.x(), top_left.y(), self.width(), self.height())
-            settings = {'os_screen_region': os_screen_region}
-            # we have to save this to reuse it by the tutorials
-            save_settings_qsettings(self.settings_tag, settings)
-        QtWidgets.QWidget.moveEvent(self, event)
+        """
+        Move event method
+
+        This method is called when a move event is triggered for the linearview, tableview, topview, sideview widget.
+        It is an overridden method of the QWidget class.
+
+        Parameters:
+        :event: The QEvent object representing the move event.
+        """
+        if self.tutorial_mode:
+            top_left = self.mapToGlobal(QtCore.QPoint(0, 0))
+            if top_left.x() != 0:
+                os_screen_region = (top_left.x(), top_left.y(), self.width(), self.height())
+                settings = {'os_screen_region': os_screen_region}
+                # we have to save this to reuse it by the tutorials
+                save_settings_qsettings(self.settings_tag, settings)
+            QtWidgets.QWidget.moveEvent(self, event)
 
 
 class MSUIMplViewWindow(MSUIViewWindow):
@@ -254,9 +274,12 @@ class MSUIMplViewWindow(MSUIViewWindow):
 
             # Update Top View flighttrack name
             if hasattr(self.mpl.canvas, "map"):
-                self.mpl.canvas.map.operation_name = model.name
-                self.mpl.canvas.map.update_info_text(name=model.name)
+                self.mpl.canvas.map.ax.figure.suptitle(f"{model.name}", x=0.95, ha='right')
                 self.mpl.canvas.map.ax.figure.canvas.draw()
+
+            elif hasattr(self.mpl.canvas, 'plotter'):
+                self.mpl.canvas.plotter.fig.suptitle(f"{model.name}", x=0.95, ha='right')
+                self.mpl.canvas.plotter.fig.canvas.draw()
 
     def getView(self):
         """

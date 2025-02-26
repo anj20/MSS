@@ -17,6 +17,15 @@ When it is ready the developer version becomes the next stable.
 
 The stable version of MSS is tracked on `BLACK DUCK Open Hub <https://www.openhub.net/p/mss>`_
 
+
+Contributing
+------------
+
+Please read our `contributing <https://open-mss.github.io/contributing/>`_ guidelines and
+`setup instructions <https://open-mss.github.io/develop/Setup-Instructions>`_ to get
+started with MSS development.
+
+
 Using our Issue Tracker on github
 ---------------------------------
 
@@ -35,9 +44,6 @@ First, please refer to the applicable `GitHub repository <https://github.com/Ope
 Then, please `create a new issue <https://github.com/Open-MSS/MSS/issues/new>`_ in the GitHub repository describing your enhancement.
 
 Be sure to include as much detail as possible including step-by-step descriptions, specific examples, screenshots or mockups, and reasoning for why the enhancement might be worthwhile.
-
-
-
 
 
 Forking the Repo
@@ -175,7 +181,6 @@ Going to http://localhost:8083/status should now show "MSColab server". This mea
 Now you can use the MSS desktop application to connect to it using the MSColab window of the application.
 
 
-
 Code Style
 ----------
 
@@ -262,7 +267,7 @@ This plugin produces a coverage report, example::
     --------------------------------------------------------------------------
     mslib/__init__.py                            2      0      0      0   100%
     mslib/msui/__init__.py                      23      0      0      0   100%
-    mslib/msui/aircrafts.py                     52      1      8      1    97%
+    mslib/msui/aircraft.py                      52      1      8      1    97%
     mslib/msui/constants.py                     12      2      4      2    75%
     mslib/msui/flighttrack.py                  383    117    141     16    66%
 
@@ -310,6 +315,119 @@ MSS uses pytest as a test runner and therefore their `docs <https://docs.pytest.
 Common resources that a test might need,
 like e.g. a running MSColab server or a QApplication instance for GUI tests,
 are collected in :mod:`tests.fixtures` in the form of pytest fixtures that can be requested as needed in tests.
+
+Keyring Features
+-----------------
+
+This document outlines step-by-step instructions for using the keyring features using the command line.
+
+Prerequisites
+..............
+
+1. **Confirm the Default Keyring Backend**
+
+   Use the following command to list available keyring backends and check which one is currently in use:
+
+   .. code-block:: bash
+
+       keyring --list-backends
+
+Command-Line Commands for Keyring
+..................................
+
+1. **Set a Password**
+
+   Store a password for a specific service and user:
+
+   .. code-block:: bash
+
+       keyring set SERVICE_NAME USERNAME
+
+   **Example:**
+
+  - Case 1: Standard Service Name
+   .. code-block:: bash
+
+       keyring set http://localhost:8083 myname@mydomain
+
+  - Case 2: Custom Authentication Service
+   .. code-block:: bash
+
+       keyring set MSCOLAB_AUTH_http://localhost:8083 mscolab
+
+  - The command will securely prompt you to input a password (e.g., `example_password`).
+
+2. **Get a Password**
+
+   Retrieve the stored password for a service and user:
+
+   .. code-block:: bash
+
+       keyring get SERVICE_NAME USERNAME
+
+   **Example:**
+
+   - Case 1: Standard Service Name
+   .. code-block:: bash
+
+       keyring get http://localhost:8083 myname@mydomain
+
+   - Case 2: Custom Authentication Service
+   .. code-block:: bash
+
+       keyring get MSCOLAB_AUTH_http://localhost:8083 mscolab
+
+   **Output:**
+
+   .. code-block::
+
+       example_password
+
+3. **Delete a Password**
+
+   Remove the stored password for a service and user:
+
+   .. code-block:: bash
+
+       keyring del SERVICE_NAME USERNAME
+
+   **Example:**
+
+  - Case 1: Standard Service Name
+   .. code-block:: bash
+
+       keyring del http://localhost:8083 myname@mydomain
+
+  - Case 2: Custom Authentication Service
+   .. code-block:: bash
+
+       keyring del MSCOLAB_AUTH_http://localhost:8083 mscolab
+
+   To confirm the deletion, attempt to retrieve the password:
+
+   .. code-block:: bash
+
+       keyring get MSCOLAB_AUTH_http://localhost:8083 mscolab
+
+
+Changing the database model
+---------------------------
+
+Changing the database model requires adding a corresponding migration script to MSS,
+so that existing databases can be migrated automatically.
+
+To generate such a migration script you can run::
+
+  flask --app mslib.mscolab.app db migrate -d mslib/mscolab/migrations -m "To version <next-major-version>"
+
+Depending on the complexity of the changes that were made,
+the generated migration script might need some tweaking.
+
+If there is already a migration script for the next release,
+then please incorporate the generated migration script into this existing one,
+instead of adding a new one.
+You can still generate a script with the above command first
+to get a starting point for the changes.
 
 
 Pushing your changes

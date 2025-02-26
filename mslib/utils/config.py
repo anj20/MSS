@@ -74,18 +74,96 @@ class MSUIDefaultConfig:
 
     # Predefined map regions to be listed in the corresponding topview combobox
     predefined_map_sections = {
-        "01 Europe (cyl)": {"CRS": "EPSG:4326",
-                            "map": {"llcrnrlon": -15.0, "llcrnrlat": 35.0,
-                                    "urcrnrlon": 30.0, "urcrnrlat": 65.0}},
-        "02 Germany (cyl)": {"CRS": "EPSG:4326",
-                             "map": {"llcrnrlon": 5.0, "llcrnrlat": 45.0,
-                                     "urcrnrlon": 15.0, "urcrnrlat": 57.0}},
-        "03 Global (cyl)": {"CRS": "EPSG:4326",
-                            "map": {"llcrnrlon": -180.0, "llcrnrlat": -90.0,
-                                    "urcrnrlon": 180.0, "urcrnrlat": 90.0}},
-        "04 Northern Hemisphere (stereo)": {"CRS": "MSS:stere,0,90,90",
-                                            "map": {"llcrnrlon": -45.0, "llcrnrlat": 0.0,
-                                                    "urcrnrlon": 135.0, "urcrnrlat": 0.0}}
+        "00 global (cyl)": {
+            "CRS": "EPSG:4326",
+            "map": {
+                "llcrnrlon": -180.0,
+                "llcrnrlat": -90.0,
+                "urcrnrlon": 180.0,
+                "urcrnrlat": 90.0
+            }
+        },
+        "01 SADPAP (stereo)": {
+            "CRS": "EPSG:77890290",
+            "map": {
+                "llcrnrlon": -150.0,
+                "llcrnrlat": -45.0,
+                "urcrnrlon": -25.0,
+                "urcrnrlat": -20.0
+            }
+        },
+        "02 SADPAP zoom (stereo)": {
+            "CRS": "EPSG:77890290",
+            "map": {
+                "llcrnrlon": -120.0,
+                "llcrnrlat": -65.0,
+                "urcrnrlon": -45.0,
+                "urcrnrlat": -28.0
+            }
+        },
+        "03 SADPAP (cyl)": {
+            "CRS": "EPSG:4326",
+            "map": {
+                "llcrnrlon": -100.0,
+                "llcrnrlat": -75.0,
+                "urcrnrlon": -30.0,
+                "urcrnrlat": -30.0
+            }
+        },
+        "04 Southern Hemisphere (stereo)": {
+            "CRS": "EPSG:77889270",
+            "map": {
+                "llcrnrlon": 135.0,
+                "llcrnrlat": 0.0,
+                "urcrnrlon": -45.0,
+                "urcrnrlat": 0.0
+            }
+        },
+        "05 EDMO-SAL (cyl)": {
+            "CRS": "EPSG:4326",
+            "map": {
+                "llcrnrlon": -40,
+                "llcrnrlat": 10,
+                "urcrnrlon": 30,
+                "urcrnrlat": 60
+            }
+        },
+        "06 SAL-BA (cyl)": {
+            "CRS": "EPSG:4326",
+            "map": {
+                "llcrnrlon": -80,
+                "llcrnrlat": -40,
+                "urcrnrlon": -10,
+                "urcrnrlat": 30
+            }
+        },
+        "07 Europe (cyl)": {
+            "CRS": "EPSG:4326",
+            "map": {
+                "llcrnrlon": -15.0,
+                "llcrnrlat": 35.0,
+                "urcrnrlon": 30.0,
+                "urcrnrlat": 65.0
+            }
+        },
+        "08 Germany (cyl)": {
+            "CRS": "EPSG:4326",
+            "map": {
+                "llcrnrlon": 5.0,
+                "llcrnrlat": 45.0,
+                "urcrnrlon": 15.0,
+                "urcrnrlat": 57.0
+            }
+        },
+        "09 Northern Hemisphere (stereo)": {
+            "CRS": "MSS:stere,0,90,90",
+            "map": {
+                "llcrnrlon": -45.0,
+                "llcrnrlat": 0.0,
+                "urcrnrlon": 135.0,
+                "urcrnrlat": 0.0
+            }
+        }
     }
 
     # Side View.
@@ -292,41 +370,43 @@ class MSUIDefaultConfig:
         "automated_plotting_flights": [["", "", "", "", "", ""]],
         "automated_plotting_hsecs": [["http://www.your-wms-server.de", "", "", ""]],
         "automated_plotting_vsecs": [["http://www.your-wms-server.de", "", "", ""]],
-        "automated_plotting_lsecs": [["http://www.your-wms-server.de", "", ""]]
+        "automated_plotting_lsecs": [["http://www.your-wms-server.de", "", "", "pressure"]]
     }
 
     config_descriptions = {
-        "filepicker_default": "Documentation Required",
-        "data_dir": "Documentation Required",
-        "predefined_map_sections": "Documentation Required",
-        "num_interpolation_points": "Documentation Required",
-        "num_labels": "Documentation Required",
-        "default_WMS": "Documentation Required",
-        "default_VSEC_WMS": "Documentation Required",
-        "default_LSEC_WMS": "Documentation Required",
-        "default_MSCOLAB": "Documentation Required",
-        "MSS_auth": "Documentation Required",
-        "MSCOLAB_auth_user_name": "Documentation Required",
-        "MSCOLAB_timeout": "Documentation Required",
-        "WMS_request_timeout": "Documentation Required",
-        "WMS_preload": "Documentation Required",
-        "wms_cache": "Documentation Required",
-        "wms_cache_max_size_bytes": "Documentation Required",
-        "wms_cache_max_age_seconds": "Documentation Required",
-        "wms_prefetch": "Documentation Required",
-        "locations": "Documentation Required",
-        "new_flighttrack_template": "Documentation Required",
-        "new_flighttrack_flightlevel": "Documentation Required",
-        "proxies": "Documentation Required",
-        "mscolab_server_url": "Documentation Required",
-        "mss_dir": "Documentation Required",
-        "gravatar_ids": "Documentation Required",
-        "export_plugins": "Documentation Required",
-        "import_plugins": "Documentation Required",
-        "layout": "Documentation Required",
-        "topview": "Documentation Required",
-        "sideview": "Documentation Required",
-        "linearview": "Documentation Required",
+        "filepicker_default": "Defines the type of file-picker to be used. Can be 'default', 'qt', or 'fs'",
+        "data_dir": "Directory where MSUI output files are stored",
+        "predefined_map_sections": "Dictionary containing predefined map sections with their settings",
+        "num_interpolation_points": "Number of interpolation points used for vertical cross section requests",
+        "num_labels": "Number of x-axis labels in the side view",
+        "default_WMS": "List of the URLs of default WMS servers",
+        "default_VSEC_WMS": "List of the URLs of default Vertical Section WMS servers",
+        "default_LSEC_WMS": "List of the URLs of default Linear Section WMS servers",
+        "default_MSCOLAB": "List of the URLs of default MSColab servers",
+        "MSS_auth": "Dictionary containing credentials for http auth",
+        "MSCOLAB_auth_user_name": "Username used for http auth",
+        "MSCOLAB_timeout": "Tuple specifying timeout for MSColab in seconds. First value is for connection,"
+                           " second for reply",
+        "WMS_request_timeout": "Timeout of WMS Url request",
+        "WMS_preload": "List of WMS URLs to preload",
+        "wms_cache": "Path to WMS image cache directory",
+        "wms_cache_max_size_bytes": "Maximum size of the cache in bytes",
+        "wms_cache_max_age_seconds": "Maximum age of a cached file in seconds",
+        "wms_prefetch": "Dictionary configuring the prefetch behaviour of WMS",
+        "locations": "Dictionary providing geo-coordinates for predefined locations",
+        "new_flighttrack_template": "List of predefined location names used as a flight track template"
+                                    " when creating a new flight track",
+        "new_flighttrack_flightlevel": "Default flight level for waypoints inserted by the flighttrack template",
+        "proxies": "Proxy settings for network requests",
+        "mscolab_server_url": "URL of the MSColab server",
+        "mss_dir": "Directory path used for MSS",  # ToDo is this needed or can be replaced by data_dir?
+        "gravatar_ids": "List of gravatar email ids to automatically fetch",
+        "export_plugins": "Dictionary of export plugins",
+        "import_plugins": "Dictionary of import plugins",
+        "layout": "Dictionary for layout of different views",
+        "topview": "Dictionary to make title, label, and ticklabel sizes for topview configurable",
+        "sideview": "Dictionary to make title, label, and ticklabel sizes for sideview configurable",
+        "linearview": "Dictionary to make title, label, and ticklabel sizes for linearview configurable",
     }
 
 

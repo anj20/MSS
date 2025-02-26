@@ -164,11 +164,12 @@ cd ..
 ####################################################
 # tutorial mscolab, 3K, because we need the menu in full screen
 
+
 # start a mscolab server on standard port after you have it seeded
 # we should have a seed for tutorials
-python ../mslib/mscolab/mscolab.py db --seed
+mscolab db --seed
 
-python ../mslib/mscolab/mscolab.py start &
+mscolab start &
 
 ~/bin/highlight-pointer -r 10 --key-quit q &
 python tutorial_mscolab.py

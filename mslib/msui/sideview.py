@@ -28,9 +28,7 @@
 
 import logging
 import functools
-
-from PyQt5 import QtGui, QtWidgets
-
+from PyQt5 import QtGui, QtWidgets, QtCore
 from mslib.msui.qt5 import ui_sideview_window as ui
 from mslib.msui.qt5 import ui_sideview_options as ui_opt
 from mslib.msui.viewwindows import MSUIMplViewWindow
@@ -39,9 +37,12 @@ from mslib.msui.icons import icons
 from mslib.utils import thermolib
 from mslib.utils.config import config_loader
 from mslib.utils.units import units, convert_to
+from mslib.msui import autoplot_dockwidget as apd
+from mslib.utils.colordialog import CustomColorDialog
 
 # Dock window indices.
 WMS = 0
+AUTOPLOT = 1
 
 
 class MSUI_SV_OptionsDialog(QtWidgets.QDialog, ui_opt.Ui_SideViewOptionsDialog):
@@ -49,6 +50,9 @@ class MSUI_SV_OptionsDialog(QtWidgets.QDialog, ui_opt.Ui_SideViewOptionsDialog):
     Dialog to specify sideview options. User interface is specified
     in "ui_sideview_options.py".
     """
+    signal_line_thickness_change = QtCore.pyqtSignal(float)
+    signal_line_style_change = QtCore.pyqtSignal(str)
+    signal_transparency_change = QtCore.pyqtSignal(float)
 
     def __init__(self, parent=None, settings=None):
         """
@@ -98,6 +102,11 @@ class MSUI_SV_OptionsDialog(QtWidgets.QDialog, ui_opt.Ui_SideViewOptionsDialog):
         self.cbVerticalLines.setChecked(settings["draw_verticals"])
         self.cbDrawMarker.setChecked(settings["draw_marker"])
 
+        self.sbLineThickness.setValue(settings.get("line_thickness", 2))
+        self.cbLineStyle.addItems(["Solid", "Dashed", "Dotted", "Dash-dot"])  # Item added in the list
+        self.cbLineStyle.setCurrentText(settings.get("line_style", "Solid"))
+        self.hsTransparencyControl.setValue(int(settings.get("line_transparency", 1.0) * 100))
+
         for button, ids in [(self.btFillColour, "colour_ft_fill"),
                             (self.btWaypointsColour, "colour_ft_waypoints"),
                             (self.btVerticesColour, "colour_ft_vertices"),
@@ -119,6 +128,24 @@ class MSUI_SV_OptionsDialog(QtWidgets.QDialog, ui_opt.Ui_SideViewOptionsDialog):
         self.btDelete.clicked.connect(self.deleteSelected)
 
         self.tableWidget.itemChanged.connect(self.itemChanged)
+
+        # Store values instead of emitting signals immediately
+        self.line_thickness = settings.get("line_thickness", 2)
+        self.line_style = settings.get("line_style", "Solid")
+        self.line_transparency = settings.get("line_transparency", 1.0)
+
+        self.sbLineThickness.valueChanged.connect(self.onLineThicknessChanged)
+        self.cbLineStyle.currentTextChanged.connect(self.onLineStyleChanged)
+        self.hsTransparencyControl.valueChanged.connect(self.onTransparencyChanged)
+
+    def onLineThicknessChanged(self, value):
+        self.line_thickness = value
+
+    def onLineStyleChanged(self, value):
+        self.line_style = value
+
+    def onTransparencyChanged(self, value):
+        self.line_transparency = value / 100
 
     def setBotTopLimits(self, axis_type):
         bot, top = {
@@ -145,15 +172,18 @@ class MSUI_SV_OptionsDialog(QtWidgets.QDialog, ui_opt.Ui_SideViewOptionsDialog):
         elif which == "ceiling":
             button = self.btCeilingColour
 
-        palette = QtGui.QPalette(button.palette())
-        colour = palette.color(QtGui.QPalette.Button)
-        colour = QtWidgets.QColorDialog.getColor(colour)
-        if colour.isValid():
+        dialog = CustomColorDialog(self)
+        dialog.color_selected.connect(lambda color: self.on_color_selected(which, color, button))
+        dialog.show()
+
+    def on_color_selected(self, which, color, button):
+        if color.isValid():
             if which == "ft_fill":
                 # Fill colour is transparent with an alpha value of 0.15. If
                 # you like to change this, modify the PathInteractor class.
-                colour.setAlphaF(0.15)
-            palette.setColor(QtGui.QPalette.Button, colour)
+                color.setAlphaF(0.15)
+            palette = QtGui.QPalette(button.palette())
+            palette.setColor(QtGui.QPalette.Button, color)
             button.setPalette(palette)
 
     def addItem(self):
@@ -215,6 +245,9 @@ class MSUI_SV_OptionsDialog(QtWidgets.QDialog, ui_opt.Ui_SideViewOptionsDialog):
             "draw_flighttrack": self.cbDrawFlightTrack.isChecked(),
             "fill_flighttrack": self.cbFillFlightTrack.isChecked(),
             "label_flighttrack": self.cbLabelFlightTrack.isChecked(),
+            "line_thickness": self.line_thickness,
+            "line_style": self.line_style,
+            "line_transparency": self.line_transparency,
             "colour_ft_vertices":
                 QtGui.QPalette(self.btVerticesColour.palette()).color(QtGui.QPalette.Button).getRgbF(),
             "colour_ft_waypoints":
@@ -252,29 +285,50 @@ class MSUISideViewWindow(MSUIMplViewWindow, ui.Ui_SideViewWindow):
     """
     name = "Side View"
 
-    def __init__(self, parent=None, model=None, _id=None):
+    refresh_signal_send = QtCore.pyqtSignal()
+    refresh_signal_emit = QtCore.pyqtSignal()
+    item_selected = QtCore.pyqtSignal(str, str, str, str)
+    vtime_vals = QtCore.pyqtSignal([list])
+    itemSecs_selected = QtCore.pyqtSignal(str)
+
+    def __init__(self, parent=None, mainwindow=None, model=None, _id=None, config_settings=None, tutorial_mode=False):
         """
         Set up user interface, connect signal/slots.
         """
         super().__init__(parent, model, _id)
+        self.tutorial_mode = tutorial_mode
         self.setupUi(self)
         self.setWindowIcon(QtGui.QIcon(icons('64x64')))
         self.settings_tag = "sideview"
         # Dock windows [WMS]:
         self.cbTools.clear()
-        self.cbTools.addItems(["(select to open control)", "Vertical Section WMS"])
-        self.docks = [None]
+        self.cbTools.addItems(["(select to open control)", "Vertical Section WMS", "Autoplot"])
+        self.docks = [None, None]
 
         self.setFlightTrackModel(model)
 
+        self.currurl = ""
+        self.currlayer = ""
+        self.currlevel = self.getView().get_settings()["vertical_axis"]
+        self.currstyles = ""
+        self.currflights = ""
+        self.currvertical = ', '.join(map(str, self.getView().get_settings()["vertical_extent"]))
+        self.currvtime = ""
+        self.curritime = ""
+        self.currlayerobj = None
+
         # Connect slots and signals.
         # ==========================
+        # ToDo review 2026 after EOL of Win 10 if we can use parent again
+        if mainwindow is not None:
+            mainwindow.refresh_signal_connect.connect(self.refresh_signal_send.emit)
 
         # Buttons to set sideview options.
         self.btOptions.clicked.connect(self.open_settings_dialog)
 
         # Tool opener.
-        self.cbTools.currentIndexChanged.connect(self.openTool)
+        self.cbTools.currentIndexChanged.connect(lambda ind: self.openTool(
+            index=ind, parent=mainwindow, config_settings=config_settings))
         self.openTool(WMS + 1)
 
     def __del__(self):
@@ -283,7 +337,7 @@ class MSUISideViewWindow(MSUIMplViewWindow, ui.Ui_SideViewWindow):
     def update_predefined_maps(self, extra):
         pass
 
-    def openTool(self, index):
+    def openTool(self, index, parent=None, config_settings=None):
         """
         Slot that handles requests to open tool windows.
         """
@@ -297,11 +351,71 @@ class MSUISideViewWindow(MSUIMplViewWindow, ui.Ui_SideViewWindow):
                     waypoints_model=self.waypoints_model,
                     view=self.mpl.canvas,
                     wms_cache=config_loader(dataset="wms_cache"))
+                widget.vtime_data.connect(lambda vtime: self.valid_time_vals(vtime))
+                widget.base_url_changed.connect(lambda url: self.url_val_changed(url))
+                widget.layer_changed.connect(lambda layer: self.layer_val_changed(layer))
+                widget.styles_changed.connect(lambda styles: self.styles_val_changed(styles))
+                widget.itime_changed.connect(lambda styles: self.itime_val_changed(styles))
+                widget.vtime_changed.connect(lambda styles: self.vtime_val_changed(styles))
+                self.item_selected.connect(lambda url, layer, style,
+                                           level: widget.row_is_selected(url, layer, style, level, "side"))
+                self.itemSecs_selected.connect(lambda vtime: widget.leftrow_is_selected(vtime))
                 self.mpl.canvas.waypoints_interactor.signal_get_vsec.connect(widget.call_get_vsec)
+            elif index == AUTOPLOT:
+                title = "Autoplot (Side View)"
+                widget = apd.AutoplotDockWidget(parent=self, parent2=parent,
+                                                view="Side View", config_settings=config_settings)
+                widget.treewidget_item_selected.connect(
+                    lambda url, layer, style, level: self.tree_item_select(url, layer, style, level))
+                widget.update_op_flight_treewidget.connect(
+                    lambda opfl, flight: parent.update_treewidget_op_fl(opfl, flight))
             else:
                 raise IndexError("invalid control index")
             # Create the actual dock widget containing <widget>.
             self.createDockWidget(index, title, widget)
+
+    @QtCore.pyqtSlot()
+    def url_val_changed(self, strr):
+        self.currurl = strr
+
+    @QtCore.pyqtSlot()
+    def layer_val_changed(self, strr):
+        self.currlayerobj = strr
+        layerstring = str(strr)
+        second_colon_index = layerstring.find(':', layerstring.find(':') + 1)
+        self.currurl = layerstring[:second_colon_index].strip() if second_colon_index != -1 else layerstring.strip()
+        self.currlayer = layerstring.split('|')[1].strip() if '|' in layerstring else None
+
+    @QtCore.pyqtSlot()
+    def tree_item_select(self, url, layer, style, level):
+        self.item_selected.emit(url, layer, style, level)
+
+    @QtCore.pyqtSlot()
+    def level_val_changed(self, strr):
+        self.currlevel = strr
+
+    @QtCore.pyqtSlot()
+    def styles_val_changed(self, strr):
+        if strr is None:
+            self.currstyles = ""
+        else:
+            self.currstyles = strr
+
+    @QtCore.pyqtSlot()
+    def vtime_val_changed(self, strr):
+        self.currvtime = strr
+
+    @QtCore.pyqtSlot()
+    def itime_val_changed(self, strr):
+        self.curritime = strr
+
+    @QtCore.pyqtSlot()
+    def valid_time_vals(self, vtimes_list):
+        self.vtime_vals.emit(vtimes_list)
+
+    @QtCore.pyqtSlot()
+    def treePlot_item_select(self, section, vtime):
+        self.itemSecs_selected.emit(vtime)
 
     def setFlightTrackModel(self, model):
         """
@@ -316,9 +430,32 @@ class MSUISideViewWindow(MSUIMplViewWindow, ui.Ui_SideViewWindow):
         Slot to open a dialog that lets the user specify sideview options.
         """
         settings = self.getView().get_settings()
+        self.currvertical = ', '.join(map(str, settings["vertical_extent"]))
+        self.currlevel = settings["vertical_axis"]
         dlg = MSUI_SV_OptionsDialog(parent=self, settings=settings)
         dlg.setModal(True)
+        dlg.signal_line_thickness_change.connect(self.set_line_thickness)  # Connect to signal
+        dlg.signal_line_style_change.connect(self.set_line_style)
+        dlg.signal_transparency_change.connect(self.set_line_transparency)
         if dlg.exec_() == QtWidgets.QDialog.Accepted:
             settings = dlg.get_settings()
             self.getView().set_settings(settings, save=True)
+            self.set_line_thickness(settings["line_thickness"])
+            self.set_line_style(settings["line_style"])
+            self.set_line_transparency(settings["line_transparency"])
+            settings.update(settings)
+        self.currvertical = ', '.join(map(str, settings["vertical_extent"]))
+        self.currlevel = settings["vertical_axis"]
         dlg.destroy()
+
+    def set_line_thickness(self, thickness):
+        """Set the line thickness of the flight track."""
+        self.mpl.canvas.waypoints_interactor.set_line_thickness(thickness)
+
+    def set_line_style(self, style):
+        """Set the line style of the flight track"""
+        self.mpl.canvas.waypoints_interactor.set_line_style(style)
+
+    def set_line_transparency(self, transparency):
+        """Set the line transparency of the flight track"""
+        self.mpl.canvas.waypoints_interactor.set_line_transparency(transparency)

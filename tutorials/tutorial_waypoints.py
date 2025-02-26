@@ -90,9 +90,9 @@ def automate_waypoints():
     pag.sleep(2)
 
     # Changing map to Global
-    find_and_click_picture('topviewwindow-01-europe-cyl.png',
+    find_and_click_picture('topviewwindow-00-global-cyl.png',
                            "Map change dropdown could not be located.")
-    select_listelement(2)
+    select_listelement(7)
     pag.sleep(5)
 
     # Zooming into the map

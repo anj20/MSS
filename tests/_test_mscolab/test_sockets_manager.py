@@ -31,7 +31,6 @@ import datetime
 from mslib.msui.icons import icons
 from mslib.mscolab.conf import mscolab_settings
 from mslib.mscolab.seed import add_user, get_user, add_operation, add_user_to_operation, get_operation
-from mslib.mscolab.sockets_manager import SocketsManager
 from mslib.mscolab.models import Permission, User, Message, MessageType
 
 
@@ -86,26 +85,47 @@ class Test_Socket_Manager:
         assert perms.u_id == self.user.id
         assert perms.access_level == "creator"
 
-    def test_join_collaborator_to_operation(self):
-        self._connect()
-        operation = self._new_operation('new_operation', "example description")
-        sm = SocketsManager(self.cm, self.fm)
-        sm.join_collaborator_to_operation(self.anotheruser.id, operation.id)
-        perms = Permission(self.anotheruser.id, operation.id, "collaborator")
-        assert perms.op_id == operation.id
-        assert perms.u_id == self.anotheruser.id
-        assert perms.access_level == "collaborator"
+    def test_active_user_tracking_and_emissions_on_operation_selection(self):
+        """
+        Test that selecting an operation tracks the active user count appropriately
+        and verifies that the correct events are emitted.
+        """
+        sio = self._connect()
 
-    def test_remove_collaborator_from_operation(self):
-        pytest.skip("get_session_id has None result")
-        operation = self._new_operation('new_operation', "example description")
-        sm = SocketsManager(self.cm, self.fm)
-        sm.join_collaborator_to_operation(self.anotheruser.id, operation.id)
-        perms = Permission(self.anotheruser.id, operation.id, "collaborator")
-        assert perms is not None
-        sm.remove_collaborator_from_operation(self.anotheruser.id, operation.id)
-        perms = Permission(self.anotheruser.id, operation.id, "collaborator")
-        assert perms is None
+        # Initial state: no active users for the operation
+        assert self.operation.id not in self.sm.active_users_per_operation
+
+        # User selects an operation
+        sio.emit("operation-selected", {"token": self.token, "op_id": self.operation.id})
+
+        # Check internal server tracking
+        assert self.operation.id in self.sm.active_users_per_operation
+        assert self.user.id in self.sm.active_users_per_operation[self.operation.id]
+        assert len(self.sm.active_users_per_operation[self.operation.id]) == 1
+
+        # Verify that the correct event is emitted
+        received_messages = sio.get_received()
+        assert len(received_messages) == 1
+        received_message_args = received_messages[0]["args"][0]
+        assert received_message_args["op_id"] == self.operation.id
+        assert received_message_args["count"] == 1
+
+        # Testing with multiple users
+        add_user_to_operation(path=self.operation_name, emailid=self.anotheruserdata[0])
+        another_sio = self._connect()
+        another_sio.emit("operation-selected",
+                         {"token": self.anotheruser.generate_auth_token(), "op_id": self.operation.id})
+
+        # Check internal server tracking
+        assert self.anotheruser.id in self.sm.active_users_per_operation[self.operation.id]
+        assert len(self.sm.active_users_per_operation[self.operation.id]) == 2
+
+        # Verify that the active user count is updated for both clients
+        updated_messages = another_sio.get_received()
+        assert len(updated_messages) == 1
+        updated_message_args = updated_messages[0]["args"][0]
+        assert updated_message_args["op_id"] == self.operation.id
+        assert updated_message_args["count"] == 2
 
     def test_handle_start_event(self):
         pytest.skip("unknown how to verify")
@@ -145,19 +165,14 @@ class Test_Socket_Manager:
         sio = self._connect()
         sio.emit('start', {'token': self.token})
 
-        # ToDo same message gets twice emitted, why? (use a helper function)
-        sio.emit("chat-message", {
-            "op_id": self.operation.id,
-            "token": self.token,
-            "message_text": "message from 1",
-            "reply_id": -1
-        })
-        sio.emit("chat-message", {
-            "op_id": self.operation.id,
-            "token": self.token,
-            "message_text": "message from 1",
-            "reply_id": -1
-        })
+        for _ in range(2):
+            sio.emit("chat-message", {
+                "op_id": self.operation.id,
+                "token": self.token,
+                "message_text": "message from 1",
+                "reply_id": -1
+            })
+
         with self.app.app_context():
             messages = self.cm.get_messages(1)
             assert messages[0]["text"] == "message from 1"
@@ -175,19 +190,13 @@ class Test_Socket_Manager:
     def test_get_messages_api(self):
         sio = self._connect()
         sio.emit('start', {'token': self.token})
-        # ToDo same message gets twice emitted, why?
-        sio.emit("chat-message", {
-            "op_id": self.operation.id,
-            "token": self.token,
-            "message_text": "message from 1",
-            "reply_id": -1
-        })
-        sio.emit("chat-message", {
-            "op_id": self.operation.id,
-            "token": self.token,
-            "message_text": "message from 1",
-            "reply_id": -1
-        })
+        for _ in range(2):
+            sio.emit("chat-message", {
+                "op_id": self.operation.id,
+                "token": self.token,
+                "message_text": "message from 1",
+                "reply_id": -1
+            })
 
         token = self.token
         data = {
