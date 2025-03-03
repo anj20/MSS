@@ -246,6 +246,7 @@ class FileManager:
                 db.session.commit()
             else:
                 return False
+        # This is the default, when we not have a special action
         user_query = User.query.filter_by(id=user.id).first()
         if user_query is None:
             return False
@@ -392,7 +393,7 @@ class FileManager:
                           "id": permission.u_id})
         return users
 
-    def save_file(self, op_id, content, user, comment=""):
+    def save_file(self, op_id, content, user, version_name=None, comment=""):
         """
         op_id: operation-id,
         content: content of the file to be saved
@@ -427,7 +428,7 @@ class FileManager:
                 repo.index.add(['main.ftml'])
                 cm = repo.index.commit("committing changes")
                 # change db table
-                change = Change(op_id, user.id, cm.hexsha)
+                change = Change(op_id, user.id, cm.hexsha, version_name=version_name)
                 db.session.add(change)
                 db.session.commit()
                 return True
