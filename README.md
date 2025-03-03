@@ -42,6 +42,7 @@ and don't need server configurations.
 
 
 ##### Updating
+
     pixi global update mss
 
 #### Project installation
