@@ -41,9 +41,9 @@ and don't need server configurations.
     mssautoplot -h
 
 
-##### Updating
+##### Upgrading
 
-    pixi global update mss
+    pixi global upgrade mss
 
 #### Project installation
 Initialize a new project and navigate to the project directory.
