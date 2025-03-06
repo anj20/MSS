@@ -39,7 +39,6 @@ console_scripts = [
     "mssautoplot = mslib.utils.mssautoplot:main",
     "msui = mslib.msui.msui:main",
     "mswms = mslib.mswms.mswms:main",]
-    # "mswms_demodata = mslib.mswms.demodata:main"]
 if os.name != 'nt':
     console_scripts.append('msidp = mslib.msidp.idp:main')
 
