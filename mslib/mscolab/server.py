@@ -24,6 +24,7 @@
     See the License for the specific language governing permissions and
     limitations under the License.
 """
+import os
 import fs
 import sys
 import functools
@@ -1018,7 +1019,8 @@ if mscolab_settings.USE_SAML2:
 
 def start_server(app, sockio, cm, fm, port=8083):
     create_files()
-    sockio.run(app, port=port, debug=mscolab_settings.DEBUG)
+    allow_unsafe = os.getenv("MSC_ALLOW_UNSAFE_WERKZEUG", "False").lower() in ("1", "true", "yes")
+    sockio.run(app, port=port, debug=mscolab_settings.DEBUG, allow_unsafe_werkzeug=allow_unsafe)
 
 
 def main():
