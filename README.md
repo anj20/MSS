@@ -76,7 +76,7 @@ On the very first start of **msui** it takes a bit longer because it setups font
 
     cd MSS
     pixi shell
-    (MSS) pixi update mss
+    (MSS) pixi upgrade mss
 
 
 Current release info

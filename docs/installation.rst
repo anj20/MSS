@@ -89,7 +89,7 @@ Updating
 
     cd MSS
     pixi shell
-    (MSS) pixi update mss
+    (MSS) pixi upgrade mss
 
 
 Server based installation example
