@@ -41,9 +41,9 @@ and don't need server configurations.
     mssautoplot -h
 
 
-##### Updating
+##### Upgrading
 
-    pixi global update mss
+    pixi global upgrade mss
 
 #### Project installation
 Initialize a new project and navigate to the project directory.
@@ -76,7 +76,7 @@ On the very first start of **msui** it takes a bit longer because it setups font
 
     cd MSS
     pixi shell
-    (MSS) pixi update mss
+    (MSS) pixi upgrade mss
 
 
 Current release info

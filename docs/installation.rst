@@ -41,12 +41,12 @@ Usage
     mscolab -h
     mssautoplot -h
 
-Updating
+Upgrading
 ........
 
 ::
 
-    pixi global update mss
+    pixi global upgrade mss
 
 
 Project installation
@@ -82,14 +82,14 @@ On the very first start of **msui** it takes a bit longer because it setups font
     (MSS) mscolab -h
     (MSS) mssautoplot -h
 
-Updating
+Upgrading
 ........
 
 ::
 
     cd MSS
     pixi shell
-    (MSS) pixi update mss
+    (MSS) pixi upgrade mss
 
 
 Server based installation example
